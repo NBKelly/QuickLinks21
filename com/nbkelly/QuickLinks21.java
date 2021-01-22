@@ -13,6 +13,10 @@ import java.util.Random;
 import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Arrays;
+import java.util.ArrayDeque;
+import java.util.Collections;
+import java.util.Scanner;
 
 public class QuickLinks21 extends Drafter {
     /* WORKFLOW:
@@ -33,13 +37,12 @@ public class QuickLinks21 extends Drafter {
     /* solve problem here */
     @Override public int solveProblem() throws Exception {
 	Timer t = makeTimer();
-	
-	
-
+		
+	/* retrieve (or generate) input */
 	ArrayList<String> input = getInput();	
-
 	DEBUG(1, t.split("Retrieved Input"));
 
+	/* get N and K */
 	String fl = input.get(0);
 	int N = Integer.parseInt(fl.split(" ")[0]);
 	int K = Integer.parseInt(fl.split(" ")[1]);
@@ -47,12 +50,21 @@ public class QuickLinks21 extends Drafter {
 	DEBUGF(2, "N:%d K:%d%n", N, K);
 	
 	/* nodes -> dest */
-	int[] nodes = new int[N];	
+	int[] nodes = new int[N];
+	Scanner nodeScanner = new Scanner(input.get(1));
 	for(int i = 0; i < N; i++)
-	    nodes[i] = Integer.parseInt(input.get(1 + i));
+	    nodes[i] = nodeScanner.nextInt();//Integer.parseInt(input.get(1 + i));
 
+	/* lookups */
+	int[] from = new int[K];
+	int[] to   = new int[K];
+	parseLookups(N, K, from, to, input);
+	
+	printNodes(nodes, 2);
+	
 	DEBUG(1, t.split("Mapped Nodes"));
-	DEBUG(2, (a2s(nodes)));
+	if(GET_DEBUG_LEVEL() >= 2)
+	    DEBUG(2, (a2s(nodes)));
 
 	/* construct all cycles */
 	ArrayList<Cycle> cycles = determineCycles(nodes);
@@ -68,30 +80,226 @@ public class QuickLinks21 extends Drafter {
 	
 	/* determine all cycle entry points */
 	DEBUG(2, "Entry Points:");
-	ArrayList<Integer> cycleEntryPoints = cycleEntryPoints(reverse, withinCycle);
-	printList(cycleEntryPoints, 2);
-	DEBUG(1, t.split("Determined all cycle entry points"));
+	ArrayList<Integer> entryPointsList = entryPoints(reverse);
+	HashSet<Integer> entryPoints = new HashSet<Integer>();
+	for(Integer i : entryPointsList)
+	    entryPoints.add(i);
 	
-	/* construct all strands */
-	      
-	DEBUG(1, t.split("Finished Processing"));
-	      
+	printList(entryPointsList, 2);
+	DEBUG(1, t.split("Identified all entry points"));
+	
+	/* determine all leaves */
+	DEBUG(2, "Leaves:");
+	ArrayList<Integer> leaves = leaves(reverse);
+	printList(leaves, 2);
+	DEBUG(1, t.split("Identified all leaves"));
+
+	/* construct all strands top-down */
+	ArrayList<Strand> strands = strands(leaves, entryPoints, nodes, withinCycle, reverse);
+	DEBUG(1, t.split("Constructed all strands"));
+	for(Strand s : strands)
+	    s.printStrand(nodes);
+	
+	/* map all nodes to their containing chunks (strands/cycles) */
+	Chunk[] chunkMap = mapChunks(strands, cycles, nodes);
+	DEBUG(1, t.split("Mapped all chunks from nodes"));
+	println("Largest strand: " + largest(strands).size());
+
+	/* map all strands based on height */
+	/* and also associate all strands with their next strand */
+	heightMap(strands, chunkMap, nodes);
+	DEBUG(1, t.split("Mapped all strands based on height"));
+		
+	/* then, solve the problem :) */
+	
+	DEBUG(1, t.total());	
 	return 0;
+    }    
+
+    private void parseLookups(int N, int K, int[] from, int[] to, ArrayList<String> input) {
+	for(int index = 0; index < K; index++) {
+	    String[] line = input.get(2 + index).split(" ");;
+	    from[index] = Integer.parseInt(line[0]);
+	    to[index] = Integer.parseInt(line[1]);
+	}
+    }
+    
+    /* O(N Log^2 N):
+       Strands are worst case log N compared to size
+       So sorting that is N LogSquared N worst case
+    */
+    private void heightMap(ArrayList<Strand> strands, Chunk[] chunkMap, int[] nodes) {
+	//first, we must sort the strands
+	Collections.sort(strands);
+
+	//we need to start with the longest strands, so our sort should place longest elements first
+	//hence s.comp(j) -> j.size() - s.size()
+	//for(Strand s : strands)
+	//    println("Size: " + s.size());
+	for(Strand strand : strands) {
+	    int last = strand.last;
+	    int next = nodes[last];
+	    Chunk nextChunk = chunkMap[next];
+
+	    assert nextChunk != strand : "Error circular chunk definition";
+	    
+	    int baseNumber = 0;
+	    if (nextChunk.getClass() == Strand.class) {
+		//get the entry point
+		baseNumber = ((Strand)nextChunk).strand.get(next) + 1;	       
+	    }
+
+	    strand.nextChunk = nextChunk;
+	    
+	    int size = strand.size();
+
+	    //size - 1 - val + base
+	    HashMap<Integer, Integer> addresses = new HashMap<Integer, Integer>();
+	    for(int key : strand.strand.keySet()) {
+		//get the value
+		int value = strand.strand.get(key);
+		addresses.put(key, size - 1 - value + baseNumber);
+	    }
+
+	    strand.strand = addresses;
+	}
+    }
+    
+    private Strand largest(ArrayList<Strand> s) {
+	var largest = s.get(0);
+	for(Strand t : s)
+	    if(t.size() > largest.size())
+		largest = t;
+	return largest;
+    }
+    
+    /* O(N) - assertions purely for peace of mind */
+    private Chunk[] mapChunks(ArrayList<Strand> strands, ArrayList<Cycle> cycles, int[] nodes) {
+	Chunk[] chunks = new Chunk[nodes.length];
+	for(Strand strand : strands) {
+	    for(int i : strand.strand.keySet()) {
+		assert chunks[i] == null : ("repeat at " + i);
+		
+		chunks[i] = strand;
+	    }
+	}
+
+	for(Cycle cycle : cycles) {
+	    for(int i : cycle.cycle.keySet()) {
+		assert chunks[i] == null : ("repeat at " + i);
+		
+		chunks[i] = cycle;
+	    }
+	}
+
+	assert !Arrays.asList(chunks).contains(null) : "empty elements in chunks";
+	
+	return chunks;
+    }
+			   
+    private void printNodes(int[] nodes, int level) {
+	for(int i = 0; i < nodes.length; i++) {
+	    if(level == 0)
+		printf("%d -> %d%n", i, nodes[i]);
+	    else
+		DEBUGF(level, "%d -> %d%n", i, nodes[i]);
+	}
     }
 
+    /* This should be O(N). Consider the following:
+       1. All lookups to entryPoints, nodes, withinCycle, reverseMapping take place in O(1) time
+       2. At each step, we look at the next node. 
+          a) If it is not an entry point, we continue to the next node
+	  b) If it is an entry point, then we add the strand to a consideration list
+	  c) once the consideration list has members equal to the size of the entry point,
+	       we select the largest element from that list and add it to the end of the working group
+	  d) The number of entry points * average entry point size is always < size of tree
+	  c) hence additional considerations occur <N times in all cases
+      3. checking the size of a strand takes O(1) time, as does checking the size of an entry point
+      4. Hence, the entire function is O(N) in time
+    */
+    private ArrayList<Strand> strands(ArrayList<Integer> leaves, HashSet<Integer> entryPoints,
+				      int[] nodes, HashSet<Integer> withinCycle,
+				      ArrayList<ArrayList<Integer>> reverseMapping) {	
+	HashMap<Integer, ArrayList<Strand>> waiting = new HashMap<>();
+	ArrayList<Strand> strands = new ArrayList<Strand>();
+	ArrayDeque<Strand> stack = new ArrayDeque<>();
+
+	for(int leaf : leaves) { 
+	    Strand s = new Strand();
+	    strands.add(s);
+	    /* if it's one of the initial L strands, provide the initial value*/	    
+	    s.add(leaf);
+	}
+	
+	stack.addAll(strands);
+
+	while(stack.size() > 0) { //for(int i = 0; i < strands.size(); i++) {
+	    Strand s = stack.pop();
+	    int ct = s.last;
+	    
+	    //follow the next trail until we find an entry point
+	    while(!entryPoints.contains(nodes[ct])) {
+		s.add(nodes[ct]);
+		ct = nodes[ct];
+	    }
+
+	    /* we don't follow the trace into a rabbit hole */
+	    if(withinCycle.contains(nodes[ct]))
+		continue;
+
+	    /* if we need to initialize this list, do so! */
+	    if(!waiting.containsKey(nodes[ct]))
+		waiting.put(nodes[ct], new ArrayList<Strand>());
+	    
+	    waiting.get(nodes[ct]).add(s);
+
+	    //then, we check the following:
+	    // 1. is the value we're waiting on part of a cycle? if so, terminate there
+	    // 2. do we have a number of waiting strands equal to the width of the entry point?
+	    //       if so, select the longest one and continue on at that point
+	    //       how do we continue? easy enough, add it to the end of the strands list
+	    //       Now, we have a question: why use a list and not a stack?
+	    //       for very large applications, memory will get tough!
+	    if(waiting.get(nodes[ct]).size() == reverseMapping.get(nodes[ct]).size()) {
+		//get the largest strand
+		Strand largest = largest(waiting.get(nodes[ct]));
+		largest.add(nodes[ct]);
+		stack.push(largest);
+		//how much of a performance hit does this have?
+		waiting.remove(nodes[ct]);
+	    }
+	}
+	
+	return strands;
+    }
     
-    private ArrayList<Integer> cycleEntryPoints(ArrayList<ArrayList<Integer>> reverseMapping, HashSet<Integer> withinCycle) {
-	ArrayList<Integer> cycleEntryPoints= new ArrayList<Integer>();
+    /* O(N) - No point is examined more once */
+    private ArrayList<Integer> entryPoints(ArrayList<ArrayList<Integer>> reverseMapping) {
+	ArrayList<Integer> allEntryPoints= new ArrayList<Integer>();
 	
 	for(int to = 0; to < reverseMapping.size(); to++) {
 	    ArrayList<Integer> entryPoints = reverseMapping.get(to);
-	    if(entryPoints.size() > 1 && withinCycle.contains(to))
-		cycleEntryPoints.add(to);
+	    if(entryPoints.size() > 1)
+		allEntryPoints.add(to);
 	}
 
-	return cycleEntryPoints;
+	return allEntryPoints;
     }
 
+    /* O(N) - No point is examined more once */
+    private ArrayList<Integer> leaves(ArrayList<ArrayList<Integer>> reverseMapping) {
+	ArrayList<Integer> leaves= new ArrayList<Integer>();
+	
+	for(int to = 0; to < reverseMapping.size(); to++) {
+	    ArrayList<Integer> entryPoints = reverseMapping.get(to);
+	    if(entryPoints.size() == 0)
+		leaves.add(to);
+	}
+
+	return leaves;
+    }
+    
     /* O(N) : no node is examined more than once */
     private ArrayList<ArrayList<Integer>> reverseMap(int[] nodes) {
 	ArrayList<ArrayList<Integer>> map = new ArrayList<>();
@@ -154,11 +362,71 @@ public class QuickLinks21 extends Drafter {
 
 	return cycles;
     }
-
+    
     private static int __CYCLE_ADDRESS = 0;
-    private class Cycle {	
-	public final int baseAddress = ++__CYCLE_ADDRESS;
+    
+    private abstract class Chunk implements Comparable<Chunk> {
+	public final int baseAddress = __CYCLE_ADDRESS++;
+	
+	//public ArrayList<Integer> address = new ArrayList<Integer>();
+	public abstract int size();
 
+	public int compareTo(Chunk c) {
+	    return c.size() - size();
+	}
+
+	public Chunk nextChunk = null;
+    }
+    
+    /* class representing a strand: a linear portion of a tree containing one exit point */
+    private class Strand extends Chunk {
+	//A strand contains:
+	//  a list of all points in the strand (start of list = bottom)
+	//  a destination
+	//  a size
+	//  an 'address book'
+	//  a destination cycle
+	//each strand has a unique numeric address, and contains an address book in the form
+	// [cycle, s1, ..., this]
+
+	// node -> position
+	private HashMap<Integer, Integer> strand = new HashMap<>();
+	private int counter = 0;
+	
+	public void add(int node) {
+	    strand.put(this.last = node, counter++);
+	}
+	
+	@Override public int size() {
+	    return strand.size();
+	}
+
+	public int last;
+
+	public void printStrand(int[] nodes) {
+	    int level = 2;
+	    if(GET_DEBUG_LEVEL() >= level) {
+		int[] str = new int[strand.size()];
+		for(int node : strand.keySet()) {
+		    str[strand.get(node)] = node;
+		}
+
+		DEBUGF(level, "Strand %d: ", baseAddress);
+		for(int i = 0; i < str.length; i++) {
+		    if(i != str.length - 1)
+			DEBUGF(level, "%d -> ", str[i]);
+		    else
+			DEBUGF(level, "%d ", str[i]);
+		}
+		/* this nice little trick colors them a different color */
+		DEBUGF(level + 1, "-> (%d)", nodes[str[str.length-1]]);
+		DEBUG(level, "");
+	    }
+	}
+    }
+
+    /* class representing a cycle : a linear portion of a tree that forms a cycle*/
+    private class Cycle extends Chunk {	
 	private HashMap<Integer, Integer> cycle;
 
 	public Cycle(HashMap<Integer, Integer> cycle) {
@@ -168,7 +436,7 @@ public class QuickLinks21 extends Drafter {
 	/* will print at given debug level */
 	public void printCycle(int level) {
 	    if(GET_DEBUG_LEVEL() >= level) {
-		String s = String.format("Address: %d%n", baseAddress);
+		String s = String.format("Cycle #%d:%n", baseAddress);
 		for(int i : cycle.keySet())
 		    s = s + String.format(" %d ->", i);
 		if(level <= 0)
@@ -201,10 +469,14 @@ public class QuickLinks21 extends Drafter {
 	}
 
 	/* O(1) */
-	public int size() {
+	@Override public int size() {
 	    return cycle.size();
 	}
-    }
+    }    
+
+
+
+
     
     /* 
      * Target Procedure:
@@ -224,7 +496,7 @@ public class QuickLinks21 extends Drafter {
      *  this means with one address lookup, we can route ourselves to any other known address in O(1) if possible (distance to strand/cycle, entry point, done)
      *  this data can all be assembled in O(1) (kind of - space might get a bit "tight"
      */
-
+    
     private ArrayList<String> getInput() {
 	/* either one or the other of these alternatives is guaranteed by generateInput/inputCommand */
 	if(generatedNodes.matched > 0 && generatedChecks.matched > 0)
@@ -249,21 +521,22 @@ public class QuickLinks21 extends Drafter {
 	/*
 	 * Format:
 	 *  N K
-	 *  N1
-	 *  ...
-	 *  NN
+	 *  N1  ... NN
 	 *  K1A K1B
 	 *  ...
 	 *  K2A K2B
 	 */
 
 	Random rand = new Random();
+	StringBuilder nodes = new StringBuilder();
 	ArrayList<String> res = new ArrayList<String>();
 	res.add(String.format("%d %d", num_nodes, num_checks));
 	
 	for(int n = 0; n < num_nodes; n++)
-	    res.add(String.format("%d", rand.nextInt(num_nodes)));	
+	    nodes.append(String.format("%d ", rand.nextInt(num_nodes)));	
 
+	res.add(nodes.toString());
+	
 	for(int k = 0; k < num_checks; k++)
 	    res.add(String.format("%d %d", rand.nextInt(num_nodes), rand.nextInt(num_nodes)));
 

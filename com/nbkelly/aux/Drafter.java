@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.io.File;
 import java.nio.file.Files;
+import java.nio.file.Path;
 
 /*
  * print(x)
@@ -422,17 +423,7 @@ public abstract class Drafter {
 	
 	try {
 	    DEBUG(1, "Reading File: " + fileToCopy);
-	    Scanner sc = new Scanner(fileToCopy);
-	    
-	    //the first line contains the old package name - discard this
-	    //sc.nextLine();
-	    //outputFileLines.add(packageName(auxiliaryPackageName.getValue()));
-	    
-	    while(sc.hasNextLine())
-		outputFileLines.add(sc.nextLine());
-	    
-	    sc.close();
-	    
+	    outputFileLines = new ArrayList<String>(Files.readAllLines(fileToCopy.toPath()));
 	} catch (Exception e) {
 	    ERR(String.format("Failure when reading from file %s", fileToCopy));
 	    ERR(e.toString());

@@ -17,6 +17,7 @@ import java.util.Arrays;
 import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.Scanner;
+import java.util.stream.IntStream;
 
 public class QuickLinks21 extends Drafter {
     /* WORKFLOW:
@@ -41,7 +42,7 @@ public class QuickLinks21 extends Drafter {
 	/* retrieve (or generate) input */
 	ArrayList<String> input = getInput();	
 	DEBUG(1, t.split("Retrieved Input"));
-
+	
 	/* get N and K */
 	String fl = input.get(0);
 	int N = Integer.parseInt(fl.split(" ")[0]);
@@ -54,13 +55,16 @@ public class QuickLinks21 extends Drafter {
 	Scanner nodeScanner = new Scanner(input.get(1));
 	for(int i = 0; i < N; i++)
 	    nodes[i] = nodeScanner.nextInt();//Integer.parseInt(input.get(1 + i));
-
+	DEBUG(1, t.split("Parsed Input (2)"));
+	
 	/* lookups */
 	int[] from = new int[K];
 	int[] to   = new int[K];
 	parseLookups(N, K, from, to, input);
 	
-	printNodes(nodes, 2);
+	input = null;
+	DEBUG(1, t.split("Parsed Input (2)"));
+	//printNodes(nodes, 2);
 	
 	DEBUG(1, t.split("Mapped Nodes"));
 	if(GET_DEBUG_LEVEL() >= 2)
@@ -99,6 +103,7 @@ public class QuickLinks21 extends Drafter {
 	DEBUG(1, t.split("Constructed all strands"));
 	for(Strand s : strands)
 	    s.printStrand(nodes);
+
 	
 	/* map all nodes to their containing chunks (strands/cycles) */
 	Chunk[] chunkMap = mapChunks(strands, cycles, nodes);
@@ -108,10 +113,20 @@ public class QuickLinks21 extends Drafter {
 	/* and also associate all strands with their next strand */
 	heightMap(strands, chunkMap, nodes);
 	DEBUG(1, t.split("Mapped all strands based on height"));
-		
+	
 	/* then, solve the problem :) */
+
+	/*
+	 * Before we do this, what memory can we free?
+	 */
+	reverse = null;
+	cycles = null;
+	strands = null;
+	withinCycle = null;
+	
 	lookup(K, from, to,
 	       nodes, chunkMap);
+	DEBUG(1, t.split("Determined all result values"));
 	
 	DEBUG(1, t.total());	
 	return 0;
@@ -119,12 +134,24 @@ public class QuickLinks21 extends Drafter {
     
     private void lookup(int K, int[] _from, int[] _to,
 			int[] nodes, Chunk[] chunkMap) {
-	for(int index = 0; index < K; index++) {
-	    int from = _from[index];
-	    int to   =   _to[index];
+	final int[] results = new int[K];
+	IntStream.range(0, K).parallel().forEach(index ->
+						 {
+						     int from = _from[index];
+						     int to   =   _to[index];
 	    
+						     results[index] = lookup_value(from, to, nodes, chunkMap);
+						 });
+
+	
+	for(int index = 0; index < K; index++) {
 	    DEBUGF(2, "Index %d: ", index);
-	    println(lookup_value(from, to, nodes, chunkMap));
+	    println(results[index]);
+	    //int from = _from[index];
+	    //int to   =   _to[index];
+	    
+	    
+	    //println(lookup_value(from, to, nodes, chunkMap));
 	}
     }
     
@@ -202,6 +229,8 @@ public class QuickLinks21 extends Drafter {
 			return -1;
 		    else if(current == toChunk)
 			return res;
+
+		    entry = nodes[current.last];
 		}
 
 		return -1;
@@ -237,10 +266,13 @@ public class QuickLinks21 extends Drafter {
 	    assert nextChunk != strand : "Error circular chunk definition";
 	    
 	    int baseNumber = 0;
+	    strand.family = nextChunk;
+	    
 	    if (nextChunk.getClass() == Strand.class) {
 		//get the entry point
 		baseNumber = ((Strand)nextChunk).strand.get(next) + 1;
 		assert nextChunk.nextChunk != null;
+		strand.family = nextChunk.family;
 	    }
 	    
 	    strand.nextChunk = nextChunk;
@@ -470,6 +502,7 @@ public class QuickLinks21 extends Drafter {
 	}
 
 	public Chunk nextChunk = null;
+	public Chunk family = null;
     }
     
     /* class representing a strand: a linear portion of a tree containing one exit point */

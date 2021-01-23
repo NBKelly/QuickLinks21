@@ -34,6 +34,7 @@ public class QuickLinks21 extends Drafter {
     private SingleChoiceCommand inputCommand;    
     private FileCommand inputFile;
     private BooleanCommand onlyPre;
+    private BooleanCommand disableParallel;
     
     /* vars */
     
@@ -57,7 +58,8 @@ public class QuickLinks21 extends Drafter {
 	Scanner nodeScanner = new Scanner(input.get(1));
 	for(int i = 0; i < N; i++)
 	    nodes[i] = nodeScanner.nextInt();//Integer.parseInt(input.get(1 + i));
-	DEBUG(1, t.split("Parsed Input (2)"));
+	DEBUG(1, t.split("Parsed Input (1)"));
+	nodeScanner.close();
 	
 	/* lookups */
 	int[] from = new int[K];
@@ -66,12 +68,12 @@ public class QuickLinks21 extends Drafter {
 	
 	input = null;
 	DEBUG(1, t.split("Parsed Input (2)"));
-	//printNodes(nodes, 2);
+	printNodes(nodes, 2);
 	
 	DEBUG(1, t.split("Mapped Nodes"));
 	if(GET_DEBUG_LEVEL() >= 2)
 	    DEBUG(2, (a2s(nodes)));
-
+	
 	/* construct all cycles */
 	ArrayList<Cycle> cycles = determineCycles(nodes);
 	DEBUG(1, t.split("Constructed Cycles"));
@@ -86,12 +88,9 @@ public class QuickLinks21 extends Drafter {
 	
 	/* determine all cycle entry points */
 	DEBUG(2, "Entry Points:");
-	ArrayList<Integer> entryPointsList = entryPoints(reverse);
-	HashSet<Integer> entryPoints = new HashSet<Integer>();
-	for(Integer i : entryPointsList)
-	    entryPoints.add(i);
+	HashSet<Integer> entryPoints = entryPoints(reverse); 
 	
-	printList(entryPointsList, 2);
+	printList(entryPoints, 2);
 	DEBUG(1, t.split("Identified all entry points"));
 	
 	/* determine all leaves */
@@ -119,16 +118,21 @@ public class QuickLinks21 extends Drafter {
 	if(onlyPre.value)
 	    return 0;
 	
-	/* then, solve the problem :) */
-
 	/*
 	 * Before we do this, what memory can we free?
+	 * I assume the garbage collector does this anyway, but it can't
+	 * really hurt to do it now, can it? I noticed earlier that I was getting a little
+	 * bit of thrashing when I did the main solve part - but that might have just been
+	 * reading input badly, and now I can't reproduce it :)
 	 */
-	reverse = null;
 	cycles = null;
-	strands = null;
 	withinCycle = null;
-	
+	reverse = null;
+	entryPoints = null;
+	leaves = null;
+	strands = null;
+
+	/* then, solve the problem :) */
 	lookup(K, from, to,
 	       nodes, chunkMap);
 	DEBUG(1, t.split("Determined all result values"));
@@ -140,23 +144,20 @@ public class QuickLinks21 extends Drafter {
     private void lookup(int K, int[] _from, int[] _to,
 			int[] nodes, Chunk[] chunkMap) {
 	final int[] results = new int[K];
-	IntStream.range(0, K).parallel().forEach(index ->
-						 {
-						     int from = _from[index];
-						     int to   =   _to[index];
-	    
-						     results[index] = lookup_value(from, to, nodes, chunkMap);
-						 });
+	IntStream range = IntStream.range(0, K);
+	if(!disableParallel.value)
+	    range = range.parallel();
 
-	
+	range.forEach(index ->
+		      {
+			  int from = _from[index];
+			  int to   =   _to[index];			  
+			  results[index] = lookup_value(from, to, nodes, chunkMap);
+		      });
+		
 	for(int index = 0; index < K; index++) {
 	    DEBUGF(2, "Index %d: ", index);
 	    println(results[index]);
-	    //int from = _from[index];
-	    //int to   =   _to[index];
-	    
-	    
-	    //println(lookup_value(from, to, nodes, chunkMap));
 	}
     }
     
@@ -406,8 +407,8 @@ public class QuickLinks21 extends Drafter {
     }
     
     /* O(N) - No point is examined more once */
-    private ArrayList<Integer> entryPoints(ArrayList<ArrayList<Integer>> reverseMapping) {
-	ArrayList<Integer> allEntryPoints= new ArrayList<Integer>();
+    private HashSet<Integer> entryPoints(ArrayList<ArrayList<Integer>> reverseMapping) {
+	HashSet<Integer> allEntryPoints= new HashSet<Integer>();
 	
 	for(int to = 0; to < reverseMapping.size(); to++) {
 	    ArrayList<Integer> entryPoints = reverseMapping.get(to);
@@ -633,14 +634,21 @@ public class QuickLinks21 extends Drafter {
 	/* either one or the other of these alternatives is guaranteed by generateInput/inputCommand */
 	if(generatedNodes.matched > 0 && generatedChecks.matched > 0)
 	    return generateInput(generatedNodes.getValue(), generatedChecks.getValue());	    
-	else if (inputFile.matched())
-	    return readFileLines(inputFile.getValue());
-	
-	/* purely for the compiler :) */
-	return null;
+
+	//else
+	assert inputFile.matched();
+	return readFileLines(inputFile.getValue());
     }
     
     private <T> void printList(ArrayList<T> li, int level) {	
+	for(T t : li)
+	    if(level <= 0)
+		println(t);
+	    else
+		DEBUG(level, t);
+    }
+    
+    private <T> void printList(HashSet<T> li, int level) {	
 	for(T t : li)
 	    if(level <= 0)
 		println(t);
@@ -698,8 +706,14 @@ public class QuickLinks21 extends Drafter {
 	onlyPre = new BooleanCommand(OPTIONAL, "--only-preprocess")
 	    .setName("Pre-process termination")
 	    .setDescription("Terminate after pre-processing");
+
+	disableParallel = new BooleanCommand(OPTIONAL, "--disable-parallel")
+	    .setName("Disables all parallel processing")
+	    .setDescription("Disallows all parallelism when computing answers");
+	
 	inputCommand = new SingleChoiceCommand("Get Input", generateInput, inputFile);
-	return new Command[]{inputCommand, onlyPre};
+
+	return new Command[]{inputCommand, onlyPre, disableParallel};
     }
     
     /* act after commands processed */

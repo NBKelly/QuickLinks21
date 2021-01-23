@@ -55,11 +55,11 @@ public class QuickLinks21 extends Drafter {
 	
 	/* nodes -> dest */
 	int[] nodes = new int[N];
-	Scanner nodeScanner = new Scanner(input.get(1));
+	String[] nodeStr = input.get(1).split(" ");	
 	for(int i = 0; i < N; i++)
-	    nodes[i] = nodeScanner.nextInt();//Integer.parseInt(input.get(1 + i));
+	    nodes[i] = Integer.parseInt(nodeStr[i]);
+	
 	DEBUG(1, t.split("Parsed Input (1)"));
-	nodeScanner.close();
 	
 	/* lookups */
 	int[] from = new int[K];
@@ -330,6 +330,9 @@ public class QuickLinks21 extends Drafter {
     }
 			   
     private void printNodes(int[] nodes, int level) {
+	if(level > GET_DEBUG_LEVEL())
+	    return;
+	
 	for(int i = 0; i < nodes.length; i++) {
 	    if(level == 0)
 		printf("%d -> %d%n", i, nodes[i]);
@@ -606,10 +609,6 @@ public class QuickLinks21 extends Drafter {
 	    return cycle.size();
 	}
     }    
-
-
-
-
     
     /* 
      * Target Procedure:

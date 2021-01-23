@@ -103,19 +103,112 @@ public class QuickLinks21 extends Drafter {
 	/* map all nodes to their containing chunks (strands/cycles) */
 	Chunk[] chunkMap = mapChunks(strands, cycles, nodes);
 	DEBUG(1, t.split("Mapped all chunks from nodes"));
-	println("Largest strand: " + largest(strands).size());
-
+	
 	/* map all strands based on height */
 	/* and also associate all strands with their next strand */
 	heightMap(strands, chunkMap, nodes);
 	DEBUG(1, t.split("Mapped all strands based on height"));
 		
 	/* then, solve the problem :) */
+	lookup(K, from, to,
+	       nodes, chunkMap);
 	
 	DEBUG(1, t.total());	
 	return 0;
     }    
+    
+    private void lookup(int K, int[] _from, int[] _to,
+			int[] nodes, Chunk[] chunkMap) {
+	for(int index = 0; index < K; index++) {
+	    int from = _from[index];
+	    int to   =   _to[index];
+	    
+	    DEBUGF(2, "Index %d: ", index);
+	    println(lookup_value(from, to, nodes, chunkMap));
+	}
+    }
+    
+    private int lookup_value(int from, int to,
+			     int[] nodes, Chunk[] chunkMap) {
+	//trivial case - identity
+	if(from == to)
+	    return 0;
+	else {
+	    //test if we are in a ring or a strand
+	    Chunk fromChunk = chunkMap[from];
+	    Chunk toChunk = chunkMap[to];
+	    /* if the destination is a cycle, the target must be in the same cycle */
+	    if(fromChunk.getClass() == Cycle.class) {
+		//a result can only exist if toChunk is in the same cycle
+		if(toChunk == fromChunk)
+		    return ((Cycle)fromChunk).distance(from, to);
+		else
+		    return -1;
+	    }
+	    else { //(fromChunk.getClass() == Strand.class) 
+		//if the destination is a cycle, then we can do a little bit of kung-fu to get there
+		assert fromChunk.getClass() == Strand.class;
+ 
+		/* if we travel from a strand to a cycle, we basically just need to check that 
+		   they both resolve in the same cycle, then compare height at cycle entry point
+		   + cycle distance */
+		int fromHeight = ((Strand)fromChunk).strand.get(from);
+		if(toChunk.getClass() == Cycle.class) {			
+		    Chunk current = fromChunk;
+		    //this resoltuion takes O(logN) over all strands,
+		    // and there can be at most O(logN) strands!
+		    // thus O(logSqN);
+		    while(current.nextChunk.getClass() != Cycle.class)
+			current = current.nextChunk;
 
+		    assert current.nextChunk.getClass() == Cycle.class;
+		    /* check if the cycles match */
+		    if(toChunk == current.nextChunk) {
+			int entryPoint = ((Strand)current).last;
+			entryPoint = nodes[entryPoint];
+			int cycleDist = ((Cycle)toChunk).distance(entryPoint, to);
+			return cycleDist + fromHeight + 1;
+		    }
+
+		    return -1;
+		}
+
+		//toChunk.class == strand
+		/* trivial case here is compare height */
+		/* equal heights is already taken care of from trivial scenario */
+		int toHeight = ((Strand)toChunk).strand.get(to);
+		int res = fromHeight - toHeight;
+		if(res < 0)
+		    return -1;
+		
+		//see if it's in our current strand
+		if(toChunk == fromChunk) {				
+		    //if it's above us in the stand, then we can't give that as an answer
+		    return res;
+		}
+
+		
+		//get the last element in this chunk
+		boolean resolved = false;
+		Strand current = (Strand)fromChunk;
+		//get the last item in this strand, see if it matches
+		int last = current.last;
+		//get the entry point into the next item
+		int entry = nodes[last];
+		while(current.nextChunk.getClass() != Cycle.class) {
+		    current = (Strand)(current.nextChunk);
+		    int entryHeight = current.strand.get(entry);
+		    if(entryHeight < toHeight)
+			return -1;
+		    else if(current == toChunk)
+			return res;
+		}
+
+		return -1;
+	    }
+	}
+    }
+    
     private void parseLookups(int N, int K, int[] from, int[] to, ArrayList<String> input) {
 	for(int index = 0; index < K; index++) {
 	    String[] line = input.get(2 + index).split(" ");;
@@ -146,13 +239,14 @@ public class QuickLinks21 extends Drafter {
 	    int baseNumber = 0;
 	    if (nextChunk.getClass() == Strand.class) {
 		//get the entry point
-		baseNumber = ((Strand)nextChunk).strand.get(next) + 1;	       
+		baseNumber = ((Strand)nextChunk).strand.get(next) + 1;
+		assert nextChunk.nextChunk != null;
 	    }
-
+	    
 	    strand.nextChunk = nextChunk;
 	    
 	    int size = strand.size();
-
+	    
 	    //size - 1 - val + base
 	    HashMap<Integer, Integer> addresses = new HashMap<Integer, Integer>();
 	    for(int key : strand.strand.keySet()) {
@@ -465,7 +559,7 @@ public class QuickLinks21 extends Drafter {
 	    int to = cycle.get(toNode);
 
 	    //distance from A to B on a ring network
-	    return (to - from) % size();
+	    return (size() + to - from) % size();
 	}
 
 	/* O(1) */

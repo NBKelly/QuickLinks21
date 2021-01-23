@@ -4,6 +4,7 @@ package com.nbkelly;
 import com.nbkelly.aux.Drafter;
 import com.nbkelly.aux.Command;
 import com.nbkelly.aux.FileCommand;
+import com.nbkelly.aux.BooleanCommand;
 import com.nbkelly.aux.AllOrNothingCommand;
 import com.nbkelly.aux.SingleChoiceCommand;
 import com.nbkelly.aux.IntCommand;
@@ -32,7 +33,8 @@ public class QuickLinks21 extends Drafter {
     private AllOrNothingCommand generateInput;
     private SingleChoiceCommand inputCommand;    
     private FileCommand inputFile;
-
+    private BooleanCommand onlyPre;
+    
     /* vars */
     
     /* solve problem here */
@@ -113,6 +115,9 @@ public class QuickLinks21 extends Drafter {
 	/* and also associate all strands with their next strand */
 	heightMap(strands, chunkMap, nodes);
 	DEBUG(1, t.split("Mapped all strands based on height"));
+
+	if(onlyPre.value)
+	    return 0;
 	
 	/* then, solve the problem :) */
 
@@ -690,8 +695,11 @@ public class QuickLinks21 extends Drafter {
 	    .setDescription("Number of checks to generate");
 	generateInput = new AllOrNothingCommand("Generate Input", generatedNodes, generatedChecks);
 
+	onlyPre = new BooleanCommand(OPTIONAL, "--only-preprocess")
+	    .setName("Pre-process termination")
+	    .setDescription("Terminate after pre-processing");
 	inputCommand = new SingleChoiceCommand("Get Input", generateInput, inputFile);
-	return new Command[]{inputCommand};
+	return new Command[]{inputCommand, onlyPre};
     }
     
     /* act after commands processed */

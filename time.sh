@@ -64,8 +64,9 @@ do
     runtime3=$(python -c "print((${runtime} - ${runtime2}))")
     #display the difference in runtimes
 
-    echo "Total:         " $runtime
-    echo "Sans-Parallel: " $runtime4
+    echo "Total:         " $runtime4
+    echo "With Parallel: " $runtime
+    echo "Parallel-Cost  " $(python -c "print((${runtime4} - ${runtime}))")
     echo "Pre:           " $runtime2
     echo "Post:          " $runtime3    
     

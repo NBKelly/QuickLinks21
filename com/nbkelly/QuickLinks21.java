@@ -55,9 +55,16 @@ public class QuickLinks21 extends Drafter {
 	
 	/* nodes -> dest */
 	int[] nodes = new int[N];
-	String[] nodeStr = input.get(1).split(" ");	
-	for(int i = 0; i < N; i++)
-	    nodes[i] = Integer.parseInt(nodeStr[i]);
+	if(N > 1000000) {
+	    Scanner sc = new Scanner(input.get(1));
+	    for(int i = 0; i < N; i++)
+		nodes[i] = sc.nextInt();
+	}
+	else {
+	    String[] nodeStr = input.get(1).split(" ");	
+	    for(int i = 0; i < N; i++)
+		nodes[i] = Integer.parseInt(nodeStr[i]);
+	}
 	
 	DEBUG(1, t.split("Parsed Input (1)"));
 	
@@ -170,6 +177,10 @@ public class QuickLinks21 extends Drafter {
 	    //test if we are in a ring or a strand
 	    Chunk fromChunk = chunkMap[from];
 	    Chunk toChunk = chunkMap[to];
+	    //check chunk family
+	    if(fromChunk.family != toChunk.family)
+		return -1;
+
 	    /* if the destination is a cycle, the target must be in the same cycle */
 	    if(fromChunk.getClass() == Cycle.class) {
 		//a result can only exist if toChunk is in the same cycle
@@ -564,9 +575,10 @@ public class QuickLinks21 extends Drafter {
     /* class representing a cycle : a linear portion of a tree that forms a cycle*/
     private class Cycle extends Chunk {	
 	private HashMap<Integer, Integer> cycle;
-
+	
 	public Cycle(HashMap<Integer, Integer> cycle) {
 	    this.cycle = cycle;
+	    this.family = this;
 	}
 
 	/* will print at given debug level */

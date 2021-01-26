@@ -45,3 +45,16 @@ N/A
 
 This is primarily done as a test of my personal workflow tool, [Drafter](https://github.com/NBKelly/Drafter), 
 but also as an attempt to improve upon my previous iteration of this problem.
+
+# Process
+The process I use is as follows:
+* parse the input: get nodes as `int[] nodes`.
+* construct all cycles. A cycle is a connected ring, where every node within the ring is reachable by every other node within the ring. Each cycle has an address, which is itself. Constructing all cycles can be done in linear time. Cycles are stored as `ArrayList<Cycle> cycles`.
+* determine all nodes that are within cycles, as `HashSet<Integer> withinCycle`. This relies on ```cycles```.
+* construct a graph in which each node points to the set of it's ancestors, in the form `ArrayList<ArrayList<Integer>> reverse`. There is probably a better data structure I could use, but this is still done in linear time.
+* determine all "entry points" - nodes with greater than one ancestor. Store as ```HashSet<Integer> entryPoints```. This relies on ```reverse```.
+* determine all leaves - nodes that have no ancestors. Store as ```ArrayList<Integer> leaves```. This relies on ```reverse```.
+* construct all strands - a strand is either a path from a cycle to a leaf, of from a strand to a leaf. Store as ```ArrayList<Strand> strands```. This relies on ```leaves, entryPoints, nodes, withinCycle, reverse```.
+* map all nodes to their parent chunks(strands/cycles), save as ```Chunk[] chunkMap```. This relies on ```strands, cycles, nodes```.
+* map every node within a strand based on height. This relies on ```strands, chunkMap, nodes```.
+* perform all lookups.

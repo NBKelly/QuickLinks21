@@ -18,14 +18,26 @@ import java.nio.file.Files;
  * DEBUGF(level, x, args) -> DEBUG(level, f(x, args))
  * DEBUG() -> DEBUG("")
  */
+/**
+ * The Drafter class serves as the base of the 'Drafter' drafting tool.
+ * <p>
+ * this class is not meant to be directly inherited, but rather a subclass and set of 
+ * auxiliary files are generated using drafter.sh or easy.sh
+ * <p>
+ * Main Pipeline: <br>
+ * 1) setCommands(): set the commands this program depends upon.<br>
+ * 2) actOnCommands(): pre-process all the commands as needed.<br>
+ * 3) doSolveProblem(): solve whatever problem you need to solve.<br>
+ */
 public abstract class Drafter {
     /** Does this session support/enable color? */
     private boolean _COLOR_ENABLED = false;
     private boolean _COLOR_CHECKED = false;
     private boolean _COLOR_HARD_DISABLED = false;
 
-    /** some handy keywords */
+    /** Keyword for mandatory commands */
     protected final boolean MANDATORY = true;
+    /** Keyword for optional commands */
     protected final boolean OPTIONAL  = false;
     
     /** used in argument processing */    
@@ -36,10 +48,12 @@ public abstract class Drafter {
 
     /** page mode */
     protected boolean _PAGE_ENABLED = false;
+    /** Is page mode user-optional? */
     protected boolean _PAGE_OPTIONAL = true;
     
     /** debug level */
     protected int _DEBUG_LEVEL = 0;
+    /** is debug enabled? if _DEBUG_LEVEL gt 0, this will be true */
     protected boolean _DEBUG = false; //true if _DEBUG_LEVEL > 0
 
     /** read input */
@@ -49,6 +63,9 @@ public abstract class Drafter {
     private Scanner _input = null;
     private String _currentLine = null;
     private ArrayList<String> _paged = new ArrayList<String>();
+
+    /** self */
+    private Drafter self = null;
     
     /*
      * for reference:
@@ -62,11 +79,22 @@ public abstract class Drafter {
      *   _NEXT_GREEDY  : next churns through lines
      */
 
+    /**
+     * Gets the debug level of this program.
+     *
+     * @return The debug level of this program.
+     */
     protected int GET_DEBUG_LEVEL() {
 	return _DEBUG_LEVEL;
     }
     
-    /** performs check-once analysis to enable colors */
+    /** 
+     * performs check-once analysis to enable colors 
+     * <p>
+     * TODO: try to make sure this works right
+     *
+     * @return true if color is enabled
+     */
     private boolean _COLOR_ENABLED() {
 	if(_COLOR_HARD_DISABLED)
 	    return false;
@@ -81,61 +109,48 @@ public abstract class Drafter {
 	return _COLOR_ENABLED;
     }
     
-    private Drafter self = null;
-    
-    //THINGS THAT NEED TO BE OVERRIDDEN
-    protected abstract void actOnCommands(); // { };
+    /**
+     * Post-process commands.
+     * <p>
+     * In the execution pipeline, this occurs after the user commands have validated, 
+     * but before the solveProblem command begins. Use this section to sanity check
+     * your inputs and variables, to assert that files exist, etc.
+     */
+    protected abstract void actOnCommands(); 
 
-    protected abstract Command[] setCommands(); /* {
-	return new Command[0];
-	}*/
+    /**
+     * Construct a set of command-arguments that the user must enter to run the program.
+     * <p>
+     * In the execution pipeline, this occurs before commands are validated and
+     * before the solveProblem command begins. Use this section to define the parameters of the
+     * problem in terms of what the user interacts with. See the *Command classes for more details.
+     *
+     * @return an array of commands representing what the user must interact with
+     */
+    protected abstract Command[] setCommands(); 
 
-    protected abstract int solveProblem() throws Exception; /* {
-	Timer t = new Timer(_DEBUG_LEVEL > 0);
-	println("Normal line");
-	print("A");
-	print("B");
-	println(a2s(new char[]{'C', 'D'}));
-	//'C');
+    /**
+     * Perform the necessary steps to solve your problem.
+     * <p>
+     * In the execution pipeline, this occurs after commands are specified and validated.
+     * Use this section to perform the main computations necessary to run your program.
+     *
+     * @return an integer return code marking the exit status of your program. 0 = success,
+     * anything else marks failure.
+     */
+    protected abstract int solveProblem() throws Exception;
 
-	DEBUG("PLAIN DEBUG");
-	DEBUG(0, "DEBUG LEVEL 0");
-	DEBUG(1, "DEBUG LEVEL 1");
-	DEBUG(2, "DEBUG LEVEL 2");
-	DEBUGF(3, "DEBUG LEVEL %d%n", 3);
-	DEBUG(4, "DEBUG LEVEL 4");
-	DEBUG(5, "DEBUG LEVEL 5");
-	DEBUG(6, "DEBUG LEVEL 6");
-
-	println(t.splitf("Solve Time: %fs"));
-	
-	//println("Has Next: " + hasNext());
-	println("First Line: " + nextLine());
-	println("Has Next: " + hasNext());
-	println(next());
-	println(next());
-	while(hasNextLine())
-	    println(nextLine());
-
-	println("Here's the results of our page:");
-	for(String s: _paged)
-	    printf("paged : '%s'%n", s);
-	    }*/
-
-
-
+    /**
+     * The drafter template class allows for the effecient and clean drafting of
+     * small to medium sized programs, and allows a level of strongly defined input-scrubbing
+     * that should serve to help seperate most of the headaches and repetitive aspects of bulk
+     * programming tasks (such as programming contests like adventOfCode, etc).
+     */
     public Drafter() {
 	self = this;
 	_input = new Scanner(System.in);
     }
-    
-    
-    // TODO: get rid of this
-    /*public static void main(String[] argv) {
-	//first we set up the commands	
-	new ConceptHelperV2().run(argv); 
-	}*/
-
+        
     /**
      * Runs the given program.
      * <p>
@@ -280,7 +295,8 @@ public abstract class Drafter {
     }
 
     /**
-     * Prints out the usage for all of the commands, and then gracefully exists with given status code
+     * Prints out the usage for all of the commands,
+     * and then gracefully exists with given status code
      *
      * @param commands the set of all commands
      * @return exits the current program
@@ -404,31 +420,40 @@ public abstract class Drafter {
 	return Arrays.copyOfRange(arr, cutAt, arr.length);
     }
 
-    public ArrayList<String> readFileLines(File fileToCopy) {
+    /**
+     * Sanity checks a file, then returns the lines comprising that file.
+     * <p>
+     * If the file cannot be read, ann appropriate error will be given and null will
+     * be returned.
+     *
+     * @param fileToRead The file to read
+     * @return the output files, or null if the file could not be read
+     */
+    public ArrayList<String> readFileLines(File fileToRead) {
 	//check the file exists
-	if(!fileToCopy.exists()) {
-	    ERR(String.format("The file %s, which should exist, does not!", fileToCopy));
+	if(!fileToRead.exists()) {
+	    ERR(String.format("The file %s, which should exist, does not!", fileToRead));
 	    return null;
 	}
 	
 	//check the file is readable
 	//check the file exists
-	if(!Files.isReadable(fileToCopy.toPath())) {
-	    ERR(String.format("The file %s, which does exist, is not readable!", fileToCopy));
+	if(!Files.isReadable(fileToRead.toPath())) {
+	    ERR(String.format("The file %s, which does exist, is not readable!", fileToRead));
 	    return null;
 	}
 	
 	ArrayList<String> outputFileLines = new ArrayList<String>();
 	
 	try {
-	    DEBUG(1, "Reading File: " + fileToCopy);
-	    outputFileLines = new ArrayList<String>(Files.readAllLines(fileToCopy.toPath()));
+	    DEBUG(1, "Reading File: " + fileToRead);
+	    outputFileLines = new ArrayList<String>(Files.readAllLines(fileToRead.toPath()));
 	} catch (Exception e) {
-	    ERR(String.format("Failure when reading from file %s", fileToCopy));
+	    ERR(String.format("Failure when reading from file %s", fileToRead));
 	    ERR(e.toString());
 	    return null;
 	}
-
+	
 	return outputFileLines;
     }    
     
@@ -479,18 +504,38 @@ public abstract class Drafter {
      *     makeTimer ()  - > timer
      */
 
+    /**
+     * Constructs a debug optimized timer.
+     * <p>
+     * If debug is not enabled, then the timer will not do anything.
+     *
+     * @return a timer which may or may not be enabled
+     */
     protected Timer makeTimer() {
 	return new Timer(_DEBUG_LEVEL > 0);
     }
-    
+
+    /**
+     * The line number of stdin
+     * @return The line number of stdin
+     */
     public int lineNumber() {
 	return LINE;
     }
 
+    /**
+     * The given token within the current line of stdin
+     * @return The given token within the current line of stdin
+     */
     public int tokenNumber() {
 	return TOKEN;
     }
 
+    /**
+     * Gets the paged line at the given address,
+     * or null if paging is disabled or that line has not yet been paged
+     * @return a paged string, or null if it doesn't exist
+     */   
     public String getPage(int number) throws IllegalArgumentException {
 	if(!_PAGE_ENABLED)
 	    return null;
@@ -504,17 +549,29 @@ public abstract class Drafter {
 
 	return _paged.get(number);
     }
-    
+
+    /**
+     * Is the current line empty?
+     * @return true if the current line is empty
+     */
     public boolean isEmptyLine() {
 	return currentLine() != null && currentLine().length() == 0;
     }
-    
+
+    /**
+     * Returns the current line
+     * @return The current line
+     */
     public String currentLine() {
 	return _currentLine;
     }
 
     ///////////// NEXTBIGINTEGER
 
+    /**
+     * Returns the next BigInteger on this line, if one exists. Otherwise null.
+     * @return The next BigInteger on this line, if it exists. Otherwise null.
+     */
     public BigInteger nextBigInteger() {
         if(hasNextBigInteger()) {
             TOKEN++;
@@ -523,7 +580,11 @@ public abstract class Drafter {
 	
         return null;
     }
-    
+
+    /**
+     * Returns true if another BigInteger exists
+     * @return true if another BigInteger exists
+     */
     public boolean hasNextBigInteger() {
         if(_line != null) {
             return (_line.hasNextBigInteger());
@@ -537,6 +598,10 @@ public abstract class Drafter {
     
     ///////////// NEXTBIGDECIMAL
 
+    /**
+     * Returns the next BigDecimal on this line, if one exists. Otherwise null.
+     * @return The next BigDecimal on this line, if it exists. Otherwise null.
+     */
     public BigDecimal nextBigDecimal() {
         if(hasNextBigDecimal()) {
             TOKEN++;
@@ -545,7 +610,11 @@ public abstract class Drafter {
 	
         return null;
     }
-    
+
+    /**
+     * Returns true if another BigDecimal exists
+     * @return true if another BigDecimal exists
+     */
     public boolean hasNextBigDecimal() {
         if(_line != null) {
             return (_line.hasNextBigDecimal());
@@ -559,6 +628,10 @@ public abstract class Drafter {
     
     ///////////// NEXTDOUBLE
 
+    /**
+     * Returns the next Double on this line, if one exists. Otherwise null.
+     * @return The next Double on this line, if it exists. Otherwise null.
+     */
     public Double nextDouble() {
         if(hasNextDouble()) {
             TOKEN++;
@@ -568,6 +641,10 @@ public abstract class Drafter {
         return null;
     }
 
+    /**
+     * Returns true if another Double exists
+     * @return true if another Double exists
+     */
     public boolean hasNextDouble() {
         if(_line != null) {
             return (_line.hasNextDouble());
@@ -580,7 +657,11 @@ public abstract class Drafter {
     }
     
     ///////////// NEXTLONG
-    
+
+    /**
+     * Returns the next Long on this line, if one exists. Otherwise null.
+     * @return The next Long on this line, if it exists. Otherwise null.
+     */
     public Long nextLong() {
         if(hasNextLong()) {
             TOKEN++;
@@ -590,6 +671,10 @@ public abstract class Drafter {
         return null;
     }
 
+    /**
+     * Returns true if another Long exists
+     * @return true if another Long exists
+     */
     public boolean hasNextLong() {
         if(_line != null) {
             return (_line.hasNextLong());
@@ -602,7 +687,11 @@ public abstract class Drafter {
     }
     
     ///////////// NEXTINT
-    
+
+    /**
+     * Returns the next Integer on this line, if one exists. Otherwise null.
+     * @return The next Integer on this line, if it exists. Otherwise null.
+     */
     public Integer nextInt() {
 	if(hasNextInt()) {
 	    TOKEN++;
@@ -611,7 +700,11 @@ public abstract class Drafter {
 
 	return null;
     }
-    
+
+    /**
+     * Returns true if another Long exists
+     * @return true if another Long exists
+     */    
     public boolean hasNextInt() {
 	if(_line != null) {
 	    return (_line.hasNextInt());
@@ -624,7 +717,11 @@ public abstract class Drafter {
     }
 
     //////////// NEXT
-    
+
+    /**
+     * Returns the next Token on this line, if one exists. Otherwise null.
+     * @return The next Token on this line, if it exists. Otherwise null.
+     */
     public String next() {
 	if(hasNext()) {
 	    TOKEN++;
@@ -633,7 +730,11 @@ public abstract class Drafter {
 
 	return null;
     }
-    
+
+    /**
+     * Returns true if another token exists
+     * @return true if another token exists
+     */    
     private boolean hasNext() {
 	if(_line != null) {
 	    return (_line.hasNext());
@@ -646,7 +747,11 @@ public abstract class Drafter {
     }
 
     //////////// NEXTLINE
-    
+
+    /**
+     * Returns the next Line, if one exists. Otherwise null.
+     * @return The next Line, if it exists. Otherwise null.
+     */
     public String nextLine() {
 	if(hasNextLine()) {
 	    //if there's something left on the input
@@ -691,7 +796,11 @@ public abstract class Drafter {
 
 	return null;
     }
-    
+
+    /**
+     * Returns true if another line exists
+     * @return true if another line exists
+     */
     public boolean hasNextLine() {
 	return checkNextLine();	
     }
@@ -719,7 +828,13 @@ public abstract class Drafter {
      *                    OUTPUT COMMANDS
      *
      *********************************************************/
-    
+
+    /**
+     * The debuglogger associated with this class
+     * <p>
+     * If you wish to use the printing or debug functions of this class outside
+     * of your main class, use this logger
+     */
     public DebugLogger logger = new DebugLogger() {
 	    public void DEBUG(String s) { self.DEBUG(s); }
 	    public void DEBUG(int level, Object s) { self.DEBUG(1, s); }
@@ -765,15 +880,29 @@ public abstract class Drafter {
 	}
     }
 
+    /**
+     * Prints a blank line on debug level one
+     */
     public void DEBUG() {
 	DEBUG("");
     }
 
-    public int ERR(String message) {
-	System.err.println(_DEBUG_COLORIZE(message.toString(), _DEBUG_TO_COLOR(5)));
+    /**
+     * Prints an error message
+     * @param err the error to print
+     * @return the integer 1
+     */
+    public int ERR(String err) {
+	System.err.println(_DEBUG_COLORIZE(err.toString(), _DEBUG_TO_COLOR(5)));
 	return 1;
     }
-    
+
+    /**
+     * Prints a message on a given debug level
+     * 
+     * @param level the given debug level
+     * @param message the message to print
+     */
     public void DEBUG(int level, Object message) {
 	if(_DEBUG_LEVEL == 0)
 	    return;
@@ -783,10 +912,22 @@ public abstract class Drafter {
 	    System.err.println(_DEBUG_COLORIZE(message.toString(), _DEBUG_TO_COLOR(level)));
     }
 
+    /**
+     * Prints a message on debug level 1
+     * 
+     * @param message the message to print
+     */
     public void DEBUG(Object message) {
 	DEBUG(1, message);
     }
 
+    /**
+     * Prints a formatted message on a given debug level
+     *
+     * @param level the level to print on
+     * @param message the message to print
+     * @param args format arguments
+     */
     public void DEBUGF(int level, String message, Object... args) {
 	if(_DEBUG_LEVEL == 0)
 	    return;
@@ -801,6 +942,12 @@ public abstract class Drafter {
 	    System.err.print(_DEBUG_COLORIZE(tmp, _DEBUG_TO_COLOR(level)));
     }
 
+    /**
+     * Prints a formatted message on debug level 1
+     *
+     * @param message the message to print
+     * @param args format arguments
+     */
     public void DEBUGF(String message, Object... args) {
 	DEBUGF(1, message, args);
     }
@@ -808,19 +955,35 @@ public abstract class Drafter {
     private String _DEBUG_COLORIZE(String s, Color c) {
 	return Color.colorize(_COLOR_ENABLED(), s, c);
     }
-    
+
+    /**
+     * Prints an object to stdout
+     * @param a object to print
+     */
     public void print(Object a) {
 	System.out.print(a);
     }
 
-    public void printf(String a, Object... args) {
-	System.out.printf(a, args);
+    /**
+     * Prints a formatted string
+     * @param format format string
+     * @param args format arguments
+     */
+    public void printf(String format, Object... args) {
+	System.out.printf(format, args);
     }
 
+    /**
+     * Prints an object and cr/lf to stdout
+     * @param a object to print
+     */
     public void println(Object a) {
 	System.out.println(a);
     }
 
+    /**
+     * prints a blank line to stdout
+     */
     public void println() {
 	System.out.println();
     }
@@ -828,39 +991,92 @@ public abstract class Drafter {
 
     //array to str
 
-    
+    /**
+     * Flatten an array to a string
+     *
+     * @param a an array
+     * @return a string representation of that array
+     */
     public String a2s(Object[] a) {
 	return arrayToString(a);
     }
 
+    /**
+     * Flatten an array to a string
+     *
+     * @param a an array
+     * @return a string representation of that array
+     */
     public String a2s(int[] a) {
 	return arrayToString(a);
     }
 
+    /**
+     * Flatten an array to a string
+     *
+     * @param a an array
+     * @return a string representation of that array
+     */
     public String a2s(long[] a) {
 	return arrayToString(a);
     }
 
+    /**
+     * Flatten an array to a string
+     *
+     * @param a an array
+     * @return a string representation of that array
+     */
     public String a2s(float[] a) {
 	return arrayToString(a);
     }
 
+    /**
+     * Flatten an array to a string
+     *
+     * @param a an array
+     * @return a string representation of that array
+     */
     public String a2s(double[] a) {
 	return arrayToString(a);
     }
 
+    /**
+     * Flatten an array to a string
+     *
+     * @param a an array
+     * @return a string representation of that array
+     */
     public String a2s(boolean[] a) {
 	return arrayToString(a);
     }
 
+    /**
+     * Flatten an array to a string
+     *
+     * @param a an array
+     * @return a string representation of that array
+     */
     public String a2s(byte[] a) {
 	return arrayToString(a);
     }
 
+    /**
+     * Flatten an array to a string
+     *
+     * @param a an array
+     * @return a string representation of that array
+     */
     public String a2s(short[] a) {
 	return arrayToString(a);
     }
 
+    /**
+     * Flatten an array to a string
+     *
+     * @param a an array
+     * @return a string representation of that array
+     */
     public String a2s(char[] a) {
 	return arrayToString(a);
     }

@@ -1,20 +1,17 @@
 package com.nbkelly.aux;
 
+/** 
+ * A runtime timer, which will be enabled if the enabled var is set.
+ * <p>
+ * The timer takes into account (or at least attempts to) the time spent processing within the 
+ * timer. The timer can generate formatted output based on given input, which can be printed by
+ * other services.
+ * <p>
+ * The use of the 'enabled' var is primarily to facilitate debuging: if the timer is
+ * not enabled (ie when debugging will not take place), none of the pre-processing is done.
+ */
 public class Timer {
     private final String timer_disabled = "timer disabled";
-    //TODO: get rid of this main function later
-    public static void main(String[] argv) {
-	Timer t = new Timer(true);
-
-	for(int i = 0; i < 100000; i++) {
-	    int a = i * i * i;
-	    if(i % 10000 == 0)
-		System.out.println(t.split());
-	}
-
-	System.out.println(t.total());
-    }
-    
     private static final double nano_to_seconds = 1000000000;
     
     private long initTime = -1;
@@ -22,6 +19,14 @@ public class Timer {
     private long timeSpent = 0;    
     private boolean enabled = true;
 
+    /** 
+     * Initializes a timer, which will be enabled if the enabled var is set.
+     * <p>
+     * The use of the 'enabled' var is primarily to facilitate debuging: if the timer is
+     * not enabled (ie when debugging will not take place), none of the pre-processing is done.
+     *
+     * @param enabled is this timer enabled?
+     */
     public Timer(boolean enabled) {
 	initTime = split = System.nanoTime();
 	this.enabled = enabled;

@@ -62,3 +62,20 @@ The process I use is as follows:
 * map all nodes to their parent chunks(strands/cycles), save as ```Chunk[] chunkMap```. This relies on ```strands, cycles, nodes```.
 * map every node within a strand based on height. This relies on ```strands, chunkMap, nodes```.
 * perform all lookups.
+
+The process can be seen pictorially here:
+![(I hope)](https://raw.githubusercontent.com/NBKelly/QuickLinks21/master/graphs/Process.png "Some parallelization possible")
+
+It should immediately be obvious that some parallelization (in the pre-processing) is possible. On this I will say a few things:
+* The overhead exceeds the savings when there are either minimal cycles or there is a minimal number of leaves. This means that on some crafted inputs, the overhead will exceed the savings
+* When the number of nodes is small (< 50,000), the overhead exceeds the speedup when pre-processing
+* In general, the cases where the input is large and the pre-processing speedup is negative will still get a net gain in the post-processing (lookup) phase
+* pre-process savings can be around 30% for large files.
+
+The overall worst case ends up being somewhere between O(NlogN) and O(NlogLogN).
+
+Here are the metrics I recorded using ```./time.sh``` for QuickLinks 21:
+![QuickLinks 21](https://raw.githubusercontent.com/NBKelly/QuickLinks21/master/graphs/QuickLinks%2021.png "QL21")
+
+And compared to the previous version of QuickLinks:
+![QuickLinks 19vs21](https://raw.githubusercontent.com/NBKelly/QuickLinks21/master/graphs/QuickLinks%2019%20vs%20QuickLinks%2021.png "QL19vs21")

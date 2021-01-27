@@ -47,6 +47,10 @@ This is primarily done as a test of my personal workflow tool, [Drafter](https:/
 but also as an attempt to improve upon my previous iteration of this problem.
 
 # Process
+The nodes form a `directed simple graph permitting loops`, which can be unrolled into a series of cycles (which can be computed in O(1) time) and trees.
+
+The trees themselves can be further processesed, such that the complexity for determining if a path exists between two nodes in a tree becomes O(log(log(N))(I think) for the size of the tree.
+
 The process I use is as follows:
 * parse the input: get nodes as `int[] nodes`.
 * construct all cycles. A cycle is a connected ring, where every node within the ring is reachable by every other node within the ring. Each cycle has an address, which is itself. Constructing all cycles can be done in linear time. Cycles are stored as `ArrayList<Cycle> cycles`.

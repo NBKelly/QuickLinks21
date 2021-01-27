@@ -45,7 +45,146 @@ public class QuickLinks21 extends Drafter {
 	/* retrieve (or generate) input */
 	ArrayList<String> input = getInput();	
 	DEBUG(1, t.split("Retrieved Input"));
+
+	boolean parallel = !disableParallel.value;
+
+	if(parallel)
+	    return do_parallel(t, input);
+
+	return do_linear(t, input);
+    }
+
+    private int do_parallel(Timer t, final ArrayList<String> input) {
+	/* get N and K */
+	String fl = input.get(0);
+	int N = Integer.parseInt(fl.split(" ")[0]);
+	int K = Integer.parseInt(fl.split(" ")[1]);
 	
+	DEBUGF(2, "N:%d K:%d%n", N, K);
+	
+	/* nodes -> dest */
+	int[] nodes = new int[N];
+	if(N > 1000000) {
+	    Scanner sc = new Scanner(input.get(1));
+	    for(int i = 0; i < N; i++)
+		nodes[i] = sc.nextInt();
+	}
+	else {
+	    String[] nodeStr = input.get(1).split(" ");	
+	    for(int i = 0; i < N; i++)
+		nodes[i] = Integer.parseInt(nodeStr[i]);
+	}
+	
+	DEBUG(1, t.split("Parsed Input (1)"));
+
+	final int[] from = new int[K];
+	final int[] to   = new int[K];
+	
+	
+	final ArrayList<Cycle> cycles = new ArrayList<Cycle>();
+	final HashSet<Integer> withinCycle = new HashSet<Integer>();
+	    
+	final ArrayList<ArrayList<Integer>> reverse = new ArrayList<>();
+	final HashSet<Integer> entryPoints = new HashSet<Integer>();
+	    
+	final ArrayList<Integer> leaves = new ArrayList<Integer>();
+		    
+	IntStream.range(0, 3).parallel().forEach(order -> {
+		switch(order) {
+		case 0:
+		    //cycles and cycle membership
+		    /* construct all cycles */
+		    cycles.addAll(determineCycles(nodes));
+		    DEBUG(1, t.split("Constructed Cycles"));
+		    
+		    /* all nodes that are within cycles */
+		    withinCycle.addAll(withinCycle(cycles));
+		    DEBUG(1, t.split("Separated all nodes contained within cycles"));
+		    break;
+		case 1:
+		    //reverse, entry points, leaves
+		    /* reverse map the node list */
+		    reverse.addAll(reverseMap(nodes));
+		    DEBUG(1, t.split("Performed a reverse-mapping on all nodes"));
+
+		    IntStream.range(0, 2).parallel().forEach(sub -> {
+			    switch(sub) {
+			    case 0:
+				/* determine all entry points */
+				DEBUG(2, "Entry Points:");
+				entryPoints.addAll(entryPoints(reverse)); 
+				
+				printList(entryPoints, 2);
+				DEBUG(1, t.split("Identified all entry points"));
+				break;
+			    case 1:
+				/* determine all leaves */
+				DEBUG(2, "Leaves:");
+				leaves.addAll(leaves(reverse));
+				printList(leaves, 2);
+				DEBUG(1, t.split("Identified all leaves"));
+				break;
+			    default:
+				break;
+			    }
+			});
+		    
+		    break;
+		case 2:
+		    parseLookups(N, K, from, to, input);
+			
+		    //input = null;
+		    DEBUG(1, t.split("Parsed Input (2)"));
+		    break;
+		default:
+		    break;
+		}
+	    });
+
+
+	/* construct all strands top-down */
+	ArrayList<Strand> strands = strands(leaves, entryPoints, nodes, withinCycle, reverse);
+	DEBUG(1, t.split("Constructed all strands"));
+	for(Strand s : strands)
+	    s.printStrand(nodes);
+
+	/* map all nodes to their containing chunks (strands/cycles) */
+	Chunk[] chunkMap = mapChunks(strands, cycles, nodes);
+	DEBUG(1, t.split("Mapped all chunks from nodes"));
+	
+	/* map all strands based on height */
+	/* and also associate all strands with their next strand */
+	heightMap(strands, chunkMap, nodes);
+	DEBUG(1, t.split("Mapped all strands based on height"));
+
+	if(onlyPre.value)
+	    return 0;
+	
+	/*
+	 * Before we do this, what memory can we free?
+	 * I assume the garbage collector does this anyway, but it can't
+	 * really hurt to do it now, can it? I noticed earlier that I was getting a little
+	 * bit of thrashing when I did the main solve part - but that might have just been
+	 * reading input badly, and now I can't reproduce it :)
+	 */
+	//cycles = null;
+	//withinCycle = null;
+	//reverse = null;
+	//entryPoints = null;
+	//leaves = null;
+	//strands = null;
+
+	/* then, solve the problem :) */
+	lookup(K, from, to,
+	       nodes, chunkMap, true);
+	DEBUG(1, t.split("Determined all result values"));
+	
+	DEBUG(1, t.total());	
+
+	return 0;
+    }
+
+    private int do_linear(Timer t, ArrayList<String> input) {
 	/* get N and K */
 	String fl = input.get(0);
 	int N = Integer.parseInt(fl.split(" ")[0]);
@@ -93,7 +232,7 @@ public class QuickLinks21 extends Drafter {
 	ArrayList<ArrayList<Integer>> reverse = reverseMap(nodes);
 	DEBUG(1, t.split("Performed a reverse-mapping on all nodes"));
 	
-	/* determine all cycle entry points */
+	/* determine all entry points */
 	DEBUG(2, "Entry Points:");
 	HashSet<Integer> entryPoints = entryPoints(reverse); 
 	
@@ -141,18 +280,20 @@ public class QuickLinks21 extends Drafter {
 
 	/* then, solve the problem :) */
 	lookup(K, from, to,
-	       nodes, chunkMap);
+	       nodes, chunkMap, false);
 	DEBUG(1, t.split("Determined all result values"));
 	
 	DEBUG(1, t.total());	
+
 	return 0;
-    }    
+    }
     
     private void lookup(int K, int[] _from, int[] _to,
-			int[] nodes, Chunk[] chunkMap) {
+			int[] nodes, Chunk[] chunkMap,
+			boolean parallel) {
 	final int[] results = new int[K];
 	IntStream range = IntStream.range(0, K);
-	if(!disableParallel.value)
+	if(!parallel)
 	    range = range.parallel();
 
 	range.forEach(index ->
